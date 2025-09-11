@@ -1,0 +1,19 @@
+/* Remove default focus outlines/rings across browsers */
+.zoom-btn {
+  outline: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent; /* iOS/Safari */
+}
+
+/* Firefox inner focus border */
+.zoom-btn::-moz-focus-inner {
+  border: 0;
+}
+
+/* Don’t show any colored ring when focused/clicked */
+.zoom-btn:focus,
+.zoom-btn:focus-visible,
+.zoom-btn:active {
+  outline: none;
+  box-shadow: none;
+}
