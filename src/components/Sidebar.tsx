@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   LuChevronLeft,
   LuChevronRight,
@@ -15,32 +15,33 @@ import "react-datepicker/dist/react-datepicker.css";
 import "../styles/sidebar.css";
 import nasaLogo from "../assets/NASA.svg";
 
-type SidebarProps = { collapsed?: boolean; onToggle?: () => void; logoSrc?: string };
+type SidebarProps = {
+  collapsed?: boolean;
+  onToggle?: () => void;
+  logoSrc?: string;
+  onSearchId?: (id: string) => void;
+  onColormapChange?: (colormap: string) => void;
+  onImageryToggle?: (visible: boolean) => void;
+};
 
-// ---------- Types ----------
-interface ApiResponse {
-  id: string;
-  // add more fields if needed
-}
+interface ApiResponse { id: string; }
+interface OptionType { value: string; label: string; }
 
-interface OptionType {
-  value: string;
-  label: string;
-}
-
-// ---------- Options ----------
 const datasetOptions: OptionType[] = [
+  { value: "", label: "Select dataset" },
   { value: "hls-ndvi", label: "hls-ndvi" },
-  { value: "n02-monthly ", label: "n02-monthly" },
+  { value: "no2-monthly", label: "no2-monthly" },
+  { value: "bangladesh-landcover-2001-2020", label: "bangladesh-landcover-2001-2020" },
+  { value: "barc-thomasfire", label: "barc-thomasfire" }
 ];
 
 const colormapOptions: OptionType[] = [
+  { value: "", label: "Select colormap names" },
   { value: "viridis", label: "viridis" },
   { value: "magma", label: "magma" },
   { value: "rdylgn", label: "rdylgn" },
 ];
 
-// ---------- Custom Styles for react-select ----------
 const selectStyles: StylesConfig<OptionType, false> = {
   control: (base) => ({
     ...base,
@@ -50,38 +51,27 @@ const selectStyles: StylesConfig<OptionType, false> = {
     minHeight: "32px",
     height: "32px",
   }),
-  singleValue: (base) => ({
-    ...base,
-    color: "#000",
-  }),
-  menu: (base) => ({
-    ...base,
-    backgroundColor: "#fff",
-    zIndex: 9999,
-  }),
+  singleValue: (base) => ({ ...base, color: "#000" }),
+  menu: (base) => ({ ...base, backgroundColor: "#fff", zIndex: 9999 }),
   option: (base, state) => ({
     ...base,
-    backgroundColor: state.isSelected
-      ? "#111827"
-      : state.isFocused
-      ? "#e5e7eb"
-      : "#fff",
+    backgroundColor: state.isSelected ? "#111827" : state.isFocused ? "#e5e7eb" : "#fff",
     color: state.isSelected ? "#fff" : "#000",
     cursor: "pointer",
   }),
-  dropdownIndicator: (base) => ({
-    ...base,
-    color: "#111827",
-    padding: "0 4px",
-  }),
+  dropdownIndicator: (base) => ({ ...base, color: "#111827", padding: "0 4px" }),
   indicatorSeparator: () => ({ display: "none" }),
-  valueContainer: (base) => ({
-    ...base,
-    padding: "0 6px",
-  }),
+  valueContainer: (base) => ({ ...base, padding: "0 6px" }),
 };
 
-export default function Sidebar({ collapsed = false, onToggle, logoSrc }: SidebarProps) {
+export default function Sidebar({
+  collapsed = false,
+  onToggle,
+  logoSrc,
+  onSearchId,
+  onColormapChange,
+  onImageryToggle
+}: SidebarProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(collapsed);
   const isCollapsed = onToggle ? collapsed : internalCollapsed;
 
@@ -91,61 +81,63 @@ export default function Sidebar({ collapsed = false, onToggle, logoSrc }: Sideba
   const [rescale, setRescale] = useState(0);
   const [showImagery, setShowImagery] = useState(true);
 
-  const [apiResult, setApiResult] = useState<ApiResponse | null>(null);
-  const [tileUrl, setTileUrl] = useState<string | null>(null);
-  const [showPopup, setShowPopup] = useState(false);
-
-  const handleToggle = () => {
-    if (onToggle) onToggle();
-    else setInternalCollapsed((v) => !v);
-  };
+  const handleToggle = () => (onToggle ? onToggle() : setInternalCollapsed((v) => !v));
 
   const widthPx = isCollapsed ? 80 : 260;
+  const dateKey = date ? date.toISOString().slice(0, 10) : "";
+  const datasetKey = (dataset ?? "").trim();
 
-  // API call when date or dataset changes
+  // --- request search id when DATE or DATASET present
+  const latestSigRef = useRef<string>("");
+
   useEffect(() => {
-    if (!date || !dataset) return;
+    if (!dateKey && !datasetKey) return;
 
-    const fetchData = async () => {
+    const ac = new AbortController();
+    const sig = `${dateKey}__${datasetKey}`;
+    latestSigRef.current = sig;
+
+    (async () => {
       try {
-        const payload = {
-          collections: [dataset],
-          datetime: date.toISOString().split("T")[0] + "T00:00:00Z",
-        };
+        const payload: Record<string, unknown> = {};
+        if (datasetKey) payload.collections = [datasetKey];
+        if (dateKey) payload.datetime = `${dateKey}T00:00:00Z`;
 
-        console.log("Sending payload:", payload);
+        const response = await fetch("https://openveda.cloud/api/raster/searches/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: ac.signal,
+        });
 
-        const response = await fetch(
-          "https://openveda.cloud/api/raster/searches/register",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }
-        );
-
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data: ApiResponse = await response.json();
-        console.log("API response:", data);
-        setApiResult(data);
+
+        if (latestSigRef.current === sig && data?.id) {
+          onSearchId?.(data.id);
+        }
       } catch (err) {
-        console.error("Error fetching API:", err);
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error("register failed:", err);
       }
-    };
+    })();
 
-    fetchData();
-  }, [date, dataset]);
+    return () => ac.abort();
+  }, [dateKey, datasetKey, onSearchId]);
 
-  // Build tile URL when apiResult.id changes
-  useEffect(() => {
-    if (apiResult?.id) {
-      const url = `https://openveda.cloud/api/raster/searches/${apiResult.id}/tiles/WebMercatorQuad/{z}/{x}/{y}@1x.png?assets=cog_default&pixel_selection=first`;
-      console.log("Tile URL:", url);
-      setTileUrl(url);
-      setShowPopup(true);
-    }
-  }, [apiResult?.id]);
+  // Reset all controls
+  const handleReset = () => {
+    latestSigRef.current = "__reset__";
+    setDate(null);
+    setDataset(datasetOptions[0].value);
+    setColormap(colormapOptions[0].value);
+    setRescale(0);
+    setShowImagery(true);
+    onColormapChange?.("");
+    onImageryToggle?.(true);
+  };
 
-  // ---------- Inline Styles ----------
+  // ---------- Styles ----------
   const asideStyle: React.CSSProperties = {
     position: "relative",
     zIndex: 20,
@@ -165,51 +157,59 @@ export default function Sidebar({ collapsed = false, onToggle, logoSrc }: Sideba
 
   const headerStyle: React.CSSProperties = {
     display: "flex",
-    flexDirection: isCollapsed ? "column" : "row",
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    padding: "14px",
+    justifyContent: "space-between",
+    padding: isCollapsed ? "8px" : "14px",
     borderBottom: "1px solid #e5e7eb",
     background: "#fff",
-    gap: isCollapsed ? 6 : 10,
+    gap: 8,
+  };
+
+  const brandRowStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
   };
 
   const logoTextStyle: React.CSSProperties = {
     fontSize: 16,
     fontWeight: 700,
     color: "#111827",
-    textAlign: "center",
     whiteSpace: "nowrap",
-    opacity: 1,
   };
 
   const toggleButton: React.CSSProperties = {
-    marginLeft: isCollapsed ? 0 : "auto",
     cursor: "pointer",
     background: "#f9fafb",
     border: "1px solid #d1d5db",
     borderRadius: 6,
     padding: 4,
     transition: "all 0.2s ease",
+    flexShrink: 0,
   };
 
   const inputGroup: React.CSSProperties = {
     display: "flex",
     flexDirection: "column",
+    alignItems: isCollapsed ? "center" : "flex-start",
     gap: 6,
-    padding: "12px 14px",
+    padding: isCollapsed ? "10px 0" : "12px 14px",
     borderBottom: "1px solid #f3f4f6",
     fontSize: 14,
     background: "#fff",
   };
 
-  const labelStyle: React.CSSProperties = {
+  const itemLabel: React.CSSProperties = {
     display: "flex",
+    flexDirection: isCollapsed ? "column" : "row",
     alignItems: "center",
-    gap: 8,
-    fontSize: 13,
+    justifyContent: isCollapsed ? "center" : "flex-start",
+    gap: isCollapsed ? 2 : 8,
+    fontSize: isCollapsed ? 11 : 13,
     fontWeight: 500,
     color: "#374151",
+    textAlign: "center",
   };
 
   const footerStyle: React.CSSProperties = {
@@ -219,7 +219,9 @@ export default function Sidebar({ collapsed = false, onToggle, logoSrc }: Sideba
     color: "#6b7280",
     borderTop: "1px solid #f3f4f6",
     background: "#fff",
-    textAlign: "center",
+    display: "flex",
+    justifyContent: "flex-start",
+    alignItems: "center",
   };
 
   const Icon = isCollapsed ? LuChevronRight : LuChevronLeft;
@@ -228,24 +230,32 @@ export default function Sidebar({ collapsed = false, onToggle, logoSrc }: Sideba
     <aside
       className={`sidebar ${isCollapsed ? "collapsed" : ""}`}
       style={asideStyle}
-      onClick={() => {
-        if (isCollapsed) handleToggle();
-      }}
+      onClick={() => { if (isCollapsed) handleToggle(); }}
     >
       {/* Header */}
       <div style={headerStyle}>
-        <img
-          src={logoSrc ?? nasaLogo}
-          alt="Logo"
-          style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }}
-        />
-        <div style={logoTextStyle}>VEDA</div>
+        <div style={brandRowStyle}>
+          <img
+            src={logoSrc ?? nasaLogo}
+            alt="Logo"
+            style={{
+              width: isCollapsed ? 24 : 32,
+              height: isCollapsed ? 24 : 32,
+              borderRadius: "50%",
+              objectFit: "cover",
+            }}
+          />
+          {!isCollapsed && <div style={logoTextStyle}>VEDA</div>}
+        </div>
+
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleToggle();
-          }}
+          type="button"
+          className="btn-chevron"
           style={toggleButton}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => { e.stopPropagation(); handleToggle(); }}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={isCollapsed ? "Expand" : "Collapse"}
         >
           <Icon size={16} style={{ color: "#111827", strokeWidth: 2 }} />
         </button>
@@ -255,9 +265,10 @@ export default function Sidebar({ collapsed = false, onToggle, logoSrc }: Sideba
       <div style={{ flex: 1, overflowY: "auto" }}>
         {/* Date */}
         <div style={inputGroup} title="Select Date">
-          <label style={labelStyle}>
-            <LuCalendar size={18} /> {!isCollapsed && "Date"}
-          </label>
+          <div style={itemLabel}>
+            <LuCalendar size={18} />
+            <span>Date</span>
+          </div>
           {!isCollapsed && (
             <DatePicker
               selected={date}
@@ -265,49 +276,56 @@ export default function Sidebar({ collapsed = false, onToggle, logoSrc }: Sideba
               className="sidebar-input"
               placeholderText="Select a date"
               dateFormat="yyyy-MM-dd"
+              popperPlacement="right-start"  // centers popup below input
+              popperClassName="datepicker-popper"
             />
           )}
         </div>
 
         {/* Dataset */}
         <div style={inputGroup} title="Dataset">
-          <label style={labelStyle}>
-            <LuDatabase size={18} /> {!isCollapsed && "Dataset"}
-          </label>
+          <div style={itemLabel}>
+            <LuDatabase size={18} />
+            <span>Dataset</span>
+          </div>
           {!isCollapsed && (
             <Select<OptionType, false>
+              styles={selectStyles}
               options={datasetOptions}
               value={datasetOptions.find((o) => o.value === dataset)}
               onChange={(opt: SingleValue<OptionType>) =>
                 setDataset(opt?.value || datasetOptions[0].value)
               }
-              styles={selectStyles}
             />
           )}
         </div>
 
         {/* Colormap */}
         <div style={inputGroup} title="Colormap">
-          <label style={labelStyle}>
-            <LuPalette size={18} /> {!isCollapsed && "Colormap"}
-          </label>
+          <div style={itemLabel}>
+            <LuPalette size={18} />
+            <span>Colormap</span>
+          </div>
           {!isCollapsed && (
             <Select<OptionType, false>
+              styles={selectStyles}
               options={colormapOptions}
               value={colormapOptions.find((o) => o.value === colormap)}
-              onChange={(opt: SingleValue<OptionType>) =>
-                setColormap(opt?.value || colormapOptions[0].value)
-              }
-              styles={selectStyles}
+              onChange={(opt: SingleValue<OptionType>) => {
+                const v = opt?.value || colormapOptions[0].value;
+                setColormap(v);
+                onColormapChange?.(v);
+              }}
             />
           )}
         </div>
 
         {/* Rescale */}
         <div style={inputGroup} title="Rescale">
-          <label style={labelStyle}>
-            <LuArrowLeftRight size={18} /> {!isCollapsed && "Rescale"}
-          </label>
+          <div style={itemLabel}>
+            <LuArrowLeftRight size={18} />
+            <span>Rescale</span>
+          </div>
           {!isCollapsed && (
             <div style={{ width: "100%" }}>
               <div
@@ -339,75 +357,51 @@ export default function Sidebar({ collapsed = false, onToggle, logoSrc }: Sideba
           )}
         </div>
 
-        {/* Imagery */}
+        {/* Imagery + Reset */}
         <div style={inputGroup} title="Toggle VEDA Imagery">
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <LuImage size={18} style={{ color: "#111827", strokeWidth: 2 }} />
-            {!isCollapsed && (
-              <>
+          <div style={itemLabel}>
+            <LuImage size={18} />
+            <span>Imagery</span>
+          </div>
+
+          {!isCollapsed && (
+            <>
+              {/* Checkbox row */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
                 <span>VEDA Imagery</span>
                 <input
                   type="checkbox"
                   checked={showImagery}
-                  onChange={(e) => setShowImagery(e.target.checked)}
+                  onChange={(e) => {
+                    const visible = e.target.checked;
+                    setShowImagery(visible);
+                    onImageryToggle?.(visible);
+                  }}
                 />
-              </>
-            )}
-          </div>
+              </div>
+
+              {/* Reset button row */}
+              <div style={{ display: "flex", justifyContent: "flex-end", width: "100%", marginTop: 6 }}>
+                <button
+                  type="button"
+                  className="btn-reset"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    handleReset();
+                    (e.currentTarget as HTMLButtonElement).blur();
+                  }}
+                  title="Reset all settings"
+                >
+                  Reset
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Footer */}
-      <div style={footerStyle}>{!isCollapsed ? "v0.0" : ""}</div>
-
-      {/* Popup */}
-      {showPopup && tileUrl && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-          }}
-          onClick={() => setShowPopup(false)}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: 10,
-              borderRadius: 8,
-              maxWidth: "90%",
-              maxHeight: "90%",
-            }}
-          >
-            <img
-              src={tileUrl}
-              alt="Raster Tile"
-              style={{ maxWidth: "100%", maxHeight: "80vh" }}
-            />
-            <button
-              style={{
-                marginTop: 10,
-                padding: "6px 12px",
-                background: "#2563eb",
-                color: "#fff",
-                border: "none",
-                borderRadius: 4,
-                cursor: "pointer",
-              }}
-              onClick={() => setShowPopup(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      <div style={footerStyle}>v0.0</div>
     </aside>
   );
 }

@@ -16,10 +16,10 @@
   box-sizing: border-box;
 }
 
-/* Focus State */
+/* Focus State (inputs) */
 .sidebar-input:focus,
 .sidebar-select:focus {
-  border-color: #3b82f6; /* bright blue */
+  border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
   background: #ffffff;
 }
@@ -39,14 +39,14 @@
   -webkit-appearance: none;
   -moz-appearance: none;
   cursor: pointer;
-  padding-right: 28px; /* space for dropdown icon */
+  padding-right: 28px;
 }
 
 .select-icon {
   position: absolute;
   right: 10px;
   pointer-events: none;
-  color: #6b7280; /* neutral gray */
+  color: #6b7280;
   font-size: 14px;
 }
 
@@ -61,10 +61,7 @@
   outline: none;
   transition: background 0.2s ease;
 }
-
-.sidebar-slider:hover {
-  background: #d1d5db;
-}
+.sidebar-slider:hover { background: #d1d5db; }
 
 /* Chrome/Edge/Safari */
 .sidebar-slider::-webkit-slider-thumb {
@@ -79,10 +76,7 @@
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.15);
   transition: transform 0.15s ease;
 }
-
-.sidebar-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-}
+.sidebar-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 /* Firefox */
 .sidebar-slider::-moz-range-thumb {
@@ -95,20 +89,39 @@
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.15);
   transition: transform 0.15s ease;
 }
-
-.sidebar-slider::-moz-range-thumb:hover {
-  transform: scale(1.2);
-}
+.sidebar-slider::-moz-range-thumb:hover { transform: scale(1.2); }
 
 /* ================================
-   Checkbox
+   Checkbox (custom)
    ================================ */
 .sidebar input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
   width: 16px;
   height: 16px;
+  border: 2px solid #111827;
+  border-radius: 4px;
+  background: #fff;
   cursor: pointer;
-  accent-color: #3b82f6; /* modern blue */
+  display: inline-block;
+  position: relative;
   margin-left: 6px;
+}
+
+.sidebar input[type="checkbox"]:checked {
+  background: #111827;
+  border-color: #111827;
+}
+
+.sidebar input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  font-size: 12px;
+  color: #fff;
 }
 
 /* ================================
@@ -121,36 +134,49 @@
   color: #374151;
 }
 
-/* Hide native checkbox */
-.sidebar input[type="checkbox"] {
-  appearance: none;          /* remove OS styles */
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  width: 16px;
-  height: 16px;
-  border: 2px solid #111827; /* dark border */
-  border-radius: 4px;
-  background: #fff;          /* white background */
-  cursor: pointer;
-  display: inline-block;
-  position: relative;
-}
-
-/* Checked state */
-.sidebar input[type="checkbox"]:checked {
-  background: #111827;       /* dark background when checked */
-  border-color: #111827;
-}
-
-/* White check mark */
-.sidebar input[type="checkbox"]:checked::after {
-  content: "✓";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -55%);
+/* ================================
+   Reset Button (no blue focus ring)
+   ================================ */
+.btn-reset {
+  background: #f9fafb;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 12px;
   font-size: 12px;
-  color: #fff;               /* white tick */
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-reset:hover { background: #f3f4f6; }
+.btn-reset:focus,
+.btn-reset:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.btn-reset::-moz-focus-inner { border: 0; }
+
+/* ================================
+   Chevron Toggle — remove blue focus ring
+   ================================ */
+.btn-chevron {
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-chevron:focus,
+.btn-chevron:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Ensure datepicker is below the input, not overlaying it */
+.datepicker-popper {
+  margin-top: 6px !important;     /* pushes popup below input */
+  z-index: 9999 !important;       /* keeps it above sidebar */
+}
+
+.react-datepicker {
+  width: 100% !important;         /* match input width */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border-radius: 6px;
 }
 
 
