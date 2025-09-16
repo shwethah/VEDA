@@ -8,8 +8,10 @@ import { TileLayer } from "@deck.gl/geo-layers";
 import { BitmapLayer } from "@deck.gl/layers";
 import ZoomControl from "./ZoomControls";
 
+// Base map style (from Carto)
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 
+// Type for the DeckGL view state
 type ViewState = {
   longitude: number;
   latitude: number;
@@ -18,6 +20,7 @@ type ViewState = {
   bearing: number;
 };
 
+// Props that MapViewer accepts
 type MapViewerProps = {
   tileTemplate?: string | null;
   imageryVisible?: boolean;
@@ -25,6 +28,7 @@ type MapViewerProps = {
   maxZoom?: number;
 };
 
+// Initial map view (centered roughly on USA)
 const INITIAL_VIEW_STATE: ViewState = {
   longitude: -98,
   latitude: 39,
@@ -44,7 +48,7 @@ function isSameView(a: ViewState, b: ViewState) {
   );
 }
 
-// narrow sublayer props we actually use (keeps TS + eslint happy)
+// Narrowed type for renderSubLayers props
 type RenderProps = {
   id: string;
   data: string | HTMLImageElement | ImageBitmap;
@@ -57,8 +61,11 @@ export default function MapViewer({
   minZoom = 0,
   maxZoom = 22,
 }: MapViewerProps) {
+
+  //State: Current Map View
   const [viewState, setViewState] = useState<ViewState>(INITIAL_VIEW_STATE);
 
+  // Zooom controls (+/- buttons)
   const clamp = (z: number) => Math.max(1, Math.min(22, z));
   const zoomIn = () =>
     setViewState(v => ({
@@ -75,20 +82,24 @@ export default function MapViewer({
       transitionInterpolator: new FlyToInterpolator(),
     }));
 
+  // Disable zoom buttons at limits
   const disabledIn = viewState.zoom >= 22;
   const disabledOut = viewState.zoom <= 1;
 
+  // Sync DeckGL view state 
   const handleDeckChange = ({ viewState: vs }: ViewStateChangeParameters) => {
     const next = vs as unknown as ViewState;
     if (!isSameView(next, viewState)) setViewState(next);
   };
 
+  // Sync MapLibre view state 
   const handleMapMove = (evt: { viewState: ViewState }) => {
     if (!isSameView(evt.viewState, viewState)) setViewState(evt.viewState);
   };
 
-  // TileLayer + BitmapLayer (Deck.gl fetches tiles for the template automatically)
+  // TileLayer + BitmapLayer (Raster layer setup)
   const layers = useMemo(() => {
+    // Only add raster layer if imagery is visible and template URL is provided
     if (!tileTemplate || !imageryVisible) return [];
     return [
       new TileLayer({
@@ -115,6 +126,7 @@ export default function MapViewer({
     ];
   }, [tileTemplate, imageryVisible, minZoom, maxZoom]);
 
+  // Render UI
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <ZoomControl

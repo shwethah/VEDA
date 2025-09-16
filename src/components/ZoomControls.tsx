@@ -57,9 +57,9 @@ export default function ZoomControls({
     color: "#111827",
     padding: 0,
     userSelect: "none",
-    outline: "none",                 // ⬅️ inline fallback
-    WebkitTapHighlightColor: "transparent", // ⬅️ iOS/Safari
-    boxShadow: "none",               // ⬅️ inline fallback
+    outline: "none",                 
+    WebkitTapHighlightColor: "transparent", 
+    boxShadow: "none",               
   };
 
   const btnHover: CSSProperties = { background: "#F9FAFB" };
@@ -72,7 +72,7 @@ export default function ZoomControls({
     <div style={posStyle} aria-label="Zoom controls">
       <div style={box}>
         <button
-          className="zoom-btn"   // ⬅️ use the CSS class
+          className="zoom-btn"  
           aria-label="Zoom in"
           title="Zoom in"
           disabled={disabledIn}
@@ -89,7 +89,7 @@ export default function ZoomControls({
         </button>
         <div style={{ height: 1, background: "#E5E7EB" }} />
         <button
-          className="zoom-btn"   // ⬅️ use the CSS class
+          className="zoom-btn"   
           aria-label="Zoom out"
           title="Zoom out"
           disabled={disabledOut}

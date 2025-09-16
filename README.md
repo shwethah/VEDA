@@ -1,69 +1,45 @@
-# React + TypeScript + Vite
+### VEDA STAC
+A React application for browsing and visualizing the NASA VEDA STAC Imagery
+It connects to VEDA APIS, fetches the imagery collections, and renders them on a MapLibre basemap with deck.gl for raster visualization.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+### CORE FEATURES:
+1. Load VEDA STAC Imagery
+   This application connects to VEDA API and TiTiler to transform the search results into web-map tiles displayed in browser.
 
-Currently, two official plugins are available:
+  1.1 When the user selects the date and corresponding dataset, this triggers STAC /searches/register request
+    - The register request's payload specifies collection and datetime
+    - The API responds to the metadata containing the link, including TileJSON endpoint
+  
+  1.2 Fetch TileJSON metadata
+    - The application replaces the placeholder (e.g., {tileMatrixSetId} -> WebMercatorQuad) in the TileJSON url
+    - Additional parameters are appended for better visualization
+      * assets = cog_default
+      * pixel_selection = first
+      * colormap_name = <selected colormap>
+      * rescale = <min, max>
+    - Example of TileJSON Url:
+      https://openveda.cloud/.../tilejson.json?tileMatrixSetId=WebMercatorQuad&assets=cog_default&pixel_selection=first&colormap_name=viridis&rescale=-1,1
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+  1.3 Extract tile template
+    - The TileJSON response contains tile array with URLs like:
+      https://openveda.cloud/.../{z}/{x}/{y}?assets=cog_default&colormap_name=viridis&rescale=-1,1
+    - These {z}/{x}/{y} placeholders are the standard XYZ web-map tile scheme.
 
-## Expanding the ESLint configuration
+  1.4 Render raster tiles
+    - The app passes the tiletemplate into deck.gl's TileLayer
+    - Each {z}/{x}/{y} request retrieves a raster png from TiTiler
+    - Tiles are drawn on the map using BitmapLayer, overlaid on MapLibre Basemap
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+2. Functionality to navigate through dates
+  - Allows the user to provide a datepicker to select specific date
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+3. Toggle Later Visibility
+  - Check box is implemented to toggle VEDA imagery layer on and off
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+4. Change Colormaps and Rescale
+  - Provides dropdown option for colormaps to select different colormaps (e.g., viridis, magma, rdylgn, inferno, plasma )
+  - Allows the user to adjust the rescale parameters for better visualization
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+  
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+           

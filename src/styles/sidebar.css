@@ -1,6 +1,4 @@
-/* ================================
-   Base Inputs (DatePicker, Select)
-   ================================ */
+/* ==== Base Inputs (DatePicker, Select) === */
 .sidebar-input,
 .sidebar-select {
   flex: 1;
@@ -25,9 +23,7 @@
   background: #ffffff;
 }
 
-/* ================================
-   Custom Select
-   ================================ */
+/* === Custom Select ==== */
 .select-wrapper {
   position: relative;
   display: flex;
@@ -51,9 +47,7 @@
   font-size: 14px;
 }
 
-/* ================================
-   Slider
-   ================================ */
+/* ==== Slider ===== */
 .sidebar-slider {
   width: 100%;
   height: 6px;
@@ -92,9 +86,7 @@
 }
 .sidebar-slider::-moz-range-thumb:hover { transform: scale(1.2); }
 
-/* ================================
-   Checkbox (custom)
-   ================================ */
+/* ===== Checkbox (custom) ======= */
 .sidebar input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
@@ -125,9 +117,7 @@
   color: #fff;
 }
 
-/* ================================
-   Labels
-   ================================ */
+/* ==== Labels ===== */
 .sidebar label,
 .sidebar span {
   font-size: 13px;
@@ -135,9 +125,7 @@
   color: #374151;
 }
 
-/* ================================
-   Reset Button (no blue focus ring)
-   ================================ */
+/* ===== Reset Button (no blue focus ring) ====== */
 .btn-reset {
   background: #f9fafb;
   color: #111827;
@@ -156,9 +144,7 @@
 }
 .btn-reset::-moz-focus-inner { border: 0; }
 
-/* ================================
-   Chevron Toggle — remove blue focus ring
-   ================================ */
+/* ==== Chevron Toggle — remove blue focus ring ===== */
 .btn-chevron {
   -webkit-tap-highlight-color: transparent;
 }
@@ -170,12 +156,12 @@
 
 /* Ensure datepicker is below the input, not overlaying it */
 .datepicker-popper {
-  margin-top: 6px !important;     /* pushes popup below input */
-  z-index: 9999 !important;       /* keeps it above sidebar */
+  margin-top: 6px !important;     
+  z-index: 9999 !important;       
 }
 
 .react-datepicker {
-  width: 100% !important;         /* match input width */
+  width: 100% !important;         
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   border-radius: 6px;
 }
