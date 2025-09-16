@@ -14,6 +14,8 @@ import type { StylesConfig, SingleValue } from "react-select";
 import "react-datepicker/dist/react-datepicker.css";
 import "../styles/sidebar.css";
 import nasaLogo from "../assets/NASA.svg";
+import MultiRangeSlider from "./ui/MultiRangeSlider";
+import { ColormapOption, ColormapSingleValue } from "./ColormapGradient";
 
 type SidebarProps = {
   collapsed?: boolean;
@@ -24,15 +26,29 @@ type SidebarProps = {
   onImageryToggle?: (visible: boolean) => void;
 };
 
-interface ApiResponse { id: string; }
-interface OptionType { value: string; label: string; }
+interface ApiLink {
+  href: string;
+  rel: string;
+  title?: string;
+  templated?: boolean;
+}
+
+interface ApiResponse {
+  id: string;
+  links?: ApiLink[];
+}
+
+interface OptionType {
+  value: string;
+  label: string;
+}
 
 const datasetOptions: OptionType[] = [
   { value: "", label: "Select dataset" },
   { value: "hls-ndvi", label: "hls-ndvi" },
   { value: "no2-monthly", label: "no2-monthly" },
   { value: "bangladesh-landcover-2001-2020", label: "bangladesh-landcover-2001-2020" },
-  { value: "barc-thomasfire", label: "barc-thomasfire" }
+  { value: "barc-thomasfire", label: "barc-thomasfire" },
 ];
 
 const colormapOptions: OptionType[] = [
@@ -50,19 +66,46 @@ const selectStyles: StylesConfig<OptionType, false> = {
     boxShadow: "none",
     minHeight: "32px",
     height: "32px",
+    marginLeft: "3%",
+    width: "200px",
   }),
-  singleValue: (base) => ({ ...base, color: "#000" }),
-  menu: (base) => ({ ...base, backgroundColor: "#fff", zIndex: 9999 }),
+  singleValue: (base) => ({
+    ...base,
+    color: "#000",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis", 
+  }),
+  menu: (base) => ({
+    ...base,
+    backgroundColor: "#fff",
+    zIndex: 9999,
+    minWidth: "200px", 
+    width: "200px",        
+    marginLeft: "3%",
+  }),
   option: (base, state) => ({
     ...base,
-    backgroundColor: state.isSelected ? "#111827" : state.isFocused ? "#e5e7eb" : "#fff",
-    color: state.isSelected ? "#fff" : "#000",
+    backgroundColor: state.isSelected
+    ? "#e0f2fe"   // lighter blue background for selected option
+    : state.isFocused
+    ? "#f3f4f6"   // light gray background on hover/focus
+    : "#fff",     // default white
+    color: "#000",  // keep text always readable
     cursor: "pointer",
+    whiteSpace: "nowrap",      // stay single line
+    overflow: "hidden",
+    textOverflow: "ellipsis",  // truncate with “...”
   }),
-  dropdownIndicator: (base) => ({ ...base, color: "#111827", padding: "0 4px" }),
+  dropdownIndicator: (base) => ({
+    ...base,
+    color: "#111827",
+    padding: "0 4px",
+  }),
   indicatorSeparator: () => ({ display: "none" }),
   valueContainer: (base) => ({ ...base, padding: "0 6px" }),
 };
+
 
 export default function Sidebar({
   collapsed = false,
@@ -70,7 +113,7 @@ export default function Sidebar({
   logoSrc,
   onSearchId,
   onColormapChange,
-  onImageryToggle
+  onImageryToggle,
 }: SidebarProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(collapsed);
   const isCollapsed = onToggle ? collapsed : internalCollapsed;
@@ -78,7 +121,7 @@ export default function Sidebar({
   const [date, setDate] = useState<Date | null>(null);
   const [dataset, setDataset] = useState(datasetOptions[0].value);
   const [colormap, setColormap] = useState(colormapOptions[0].value);
-  const [rescale, setRescale] = useState(0);
+  const [rescale, setRescale] = useState<[number, number]>([0, 1000]);
   const [showImagery, setShowImagery] = useState(true);
 
   const handleToggle = () => (onToggle ? onToggle() : setInternalCollapsed((v) => !v));
@@ -87,11 +130,10 @@ export default function Sidebar({
   const dateKey = date ? date.toISOString().slice(0, 10) : "";
   const datasetKey = (dataset ?? "").trim();
 
-  // --- request search id when DATE or DATASET present
   const latestSigRef = useRef<string>("");
 
   useEffect(() => {
-    if (!dateKey && !datasetKey) return;
+    if (!dateKey || !datasetKey) return;
 
     const ac = new AbortController();
     const sig = `${dateKey}__${datasetKey}`;
@@ -99,9 +141,10 @@ export default function Sidebar({
 
     (async () => {
       try {
-        const payload: Record<string, unknown> = {};
-        if (datasetKey) payload.collections = [datasetKey];
-        if (dateKey) payload.datetime = `${dateKey}T00:00:00Z`;
+        const payload: Record<string, unknown> = {
+          collections: [datasetKey],
+          datetime: `${dateKey}T00:00:00Z`,
+        };
 
         const response = await fetch("https://openveda.cloud/api/raster/searches/register", {
           method: "POST",
@@ -112,9 +155,30 @@ export default function Sidebar({
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data: ApiResponse = await response.json();
+        console.log("register response:", data);
 
-        if (latestSigRef.current === sig && data?.id) {
-          onSearchId?.(data.id);
+        const tileJsonLink = data.links?.[1];
+        if (tileJsonLink) {
+          const href = tileJsonLink.href.replace("{tileMatrixSetId}", "WebMercatorQuad");
+          const url = new URL(href);
+          url.searchParams.set("assets", "cog_default");
+          url.searchParams.set("pixel_selection", "first");
+
+          try {
+            const tileResp = await fetch(url.toString());
+            if (!tileResp.ok) throw new Error(`TileJSON HTTP ${tileResp.status}`);
+            const tileData = await tileResp.json();
+            console.log("tilejson data:", tileData);
+
+            if (tileData.tiles && Array.isArray(tileData.tiles)) {
+              const tileTemplate = tileData.tiles[0];
+              if (latestSigRef.current === sig) {
+                onSearchId?.(tileTemplate);
+              }
+            }
+          } catch (err) {
+            console.error("TileJSON fetch error:", err);
+          }
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -125,19 +189,17 @@ export default function Sidebar({
     return () => ac.abort();
   }, [dateKey, datasetKey, onSearchId]);
 
-  // Reset all controls
   const handleReset = () => {
     latestSigRef.current = "__reset__";
     setDate(null);
     setDataset(datasetOptions[0].value);
     setColormap(colormapOptions[0].value);
-    setRescale(0);
+    setRescale([0, 1000]);
     setShowImagery(true);
     onColormapChange?.("");
     onImageryToggle?.(true);
   };
 
-  // ---------- Styles ----------
   const asideStyle: React.CSSProperties = {
     position: "relative",
     zIndex: 20,
@@ -230,7 +292,9 @@ export default function Sidebar({
     <aside
       className={`sidebar ${isCollapsed ? "collapsed" : ""}`}
       style={asideStyle}
-      onClick={() => { if (isCollapsed) handleToggle(); }}
+      onClick={() => {
+        if (isCollapsed) handleToggle();
+      }}
     >
       {/* Header */}
       <div style={headerStyle}>
@@ -253,7 +317,10 @@ export default function Sidebar({
           className="btn-chevron"
           style={toggleButton}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => { e.stopPropagation(); handleToggle(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleToggle();
+          }}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={isCollapsed ? "Expand" : "Collapse"}
         >
@@ -276,7 +343,7 @@ export default function Sidebar({
               className="sidebar-input"
               placeholderText="Select a date"
               dateFormat="yyyy-MM-dd"
-              popperPlacement="right-start"  // centers popup below input
+              popperPlacement="right-start"
               popperClassName="datepicker-popper"
             />
           )}
@@ -316,6 +383,10 @@ export default function Sidebar({
                 setColormap(v);
                 onColormapChange?.(v);
               }}
+              components={{
+                Option: ColormapOption,
+                SingleValue: ColormapSingleValue
+              }}
             />
           )}
         </div>
@@ -327,33 +398,11 @@ export default function Sidebar({
             <span>Rescale</span>
           </div>
           {!isCollapsed && (
-            <div style={{ width: "100%" }}>
-              <div
-                style={{
-                  textAlign: "center",
-                  marginBottom: 4,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "#2563eb",
-                }}
-              >
-                {rescale.toFixed(1)}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12, color: "#374151" }}>-1</span>
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.1}
-                  value={rescale}
-                  onChange={(e) => setRescale(Number(e.target.value))}
-                  className="sidebar-slider"
-                  style={{ flex: 1 }}
-                />
-                <span style={{ fontSize: 12, color: "#374151" }}>+1</span>
-              </div>
-            </div>
+            <MultiRangeSlider
+              value={rescale}
+              step={0.1}
+              onChange={(val) => setRescale(val)}
+            />
           )}
         </div>
 
@@ -366,7 +415,6 @@ export default function Sidebar({
 
           {!isCollapsed && (
             <>
-              {/* Checkbox row */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
                 <span>VEDA Imagery</span>
                 <input
@@ -380,8 +428,14 @@ export default function Sidebar({
                 />
               </div>
 
-              {/* Reset button row */}
-              <div style={{ display: "flex", justifyContent: "flex-end", width: "100%", marginTop: 6 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  width: "100%",
+                  marginTop: 6,
+                }}
+              >
                 <button
                   type="button"
                   className="btn-reset"

@@ -25,6 +25,12 @@ export default defineConfig({
         secure: true,
         rewrite: (p) => p.replace(/^\/raster/, ""),
       },
+      // Proxy Search TileJSON API (dev only)
+      "/searches": {
+        target: "https://openveda.cloud",
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
 });
