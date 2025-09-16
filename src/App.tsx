@@ -6,17 +6,18 @@ export default function App() {
   const [tileTemplateBase, setTileTemplateBase] = useState<string | null>(null);
   const [colormap, setColormap] = useState<string>(""); 
   const [imageryVisible, setImageryVisible] = useState<boolean>(true);
+  const [rescale, setRescale] = useState<[number, number]>([0, 1000]);
 
   const rasterTileTemplate = useMemo(() => {
     if (!tileTemplateBase) {
-      console.log("⏸ No base URL from Sidebar yet");
+      console.log("No base URL from Sidebar yet");
       return null;
     }
     if (!colormap.trim()) {
-      console.log("⏸ No colormap yet → raster imagery disabled");
+      console.log("No colormap yet → raster imagery disabled");
       return null;
     }
-
+    
     try {
       // Decode braces into {z}/{x}/{y}
       let finalUrl = decodeURIComponent(tileTemplateBase);
@@ -27,14 +28,17 @@ export default function App() {
       } else {
         finalUrl += `?colormap_name=${encodeURIComponent(colormap.trim())}`;
       }
-
-      console.log("✅ Final raster URL:", finalUrl);
+      // Append rescale
+      if (rescale) {
+        finalUrl += `&rescale=${rescale[0]},${rescale[1]}`;
+      }
+      console.log("Final raster URL:", finalUrl);
       return finalUrl;
     } catch (err) {
-      console.error("❌ Invalid tileTemplateBase:", tileTemplateBase, err);
+      console.error("Invalid tileTemplateBase:", tileTemplateBase, err);
       return null;
     }
-  }, [tileTemplateBase, colormap]);
+  }, [tileTemplateBase, colormap, rescale]);
 
   return (
     <div
@@ -54,9 +58,9 @@ export default function App() {
         }}
         onColormapChange={setColormap}
         onImageryToggle={setImageryVisible}
+        onRescaleChange={setRescale}  
       />
       <main style={{ flex: 1, position: "relative" }}>
-        {/* MapViewer always renders basemap. Raster only if colormap is selected */}
         <MapViewer
           tileTemplate={rasterTileTemplate}
           imageryVisible={imageryVisible}

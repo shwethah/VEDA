@@ -1,0 +1,53 @@
+// src/services/rasterApi.ts
+export interface ApiLink {
+  href: string;
+  rel: string;
+  title?: string;
+  templated?: boolean;
+}
+
+export interface ApiResponse {
+  id: string;
+  links?: ApiLink[];
+}
+
+export async function registerRasterSearch(
+  datasetKey: string,
+  dateKey: string,
+  signal?: AbortSignal
+): Promise<string | null> {
+  try {
+    const payload: Record<string, unknown> = {
+      collections: [datasetKey],
+      datetime: `${dateKey}T00:00:00Z`,
+    };
+
+    const response = await fetch("https://openveda.cloud/api/raster/searches/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data: ApiResponse = await response.json();
+
+    const tileJsonLink = data.links?.[1];
+    if (!tileJsonLink) return null;
+
+    const href = tileJsonLink.href.replace("{tileMatrixSetId}", "WebMercatorQuad");
+    const url = new URL(href);
+    url.searchParams.set("assets", "cog_default");
+    url.searchParams.set("pixel_selection", "first");
+
+    const tileResp = await fetch(url.toString(), { signal });
+    if (!tileResp.ok) throw new Error(`TileJSON HTTP ${tileResp.status}`);
+    const tileData = await tileResp.json();
+
+    return Array.isArray(tileData.tiles) ? tileData.tiles[0] : null;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") return null;
+    console.error("Raster API error:", err);
+    return null;
+  }
+}

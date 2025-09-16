@@ -1,0 +1,23 @@
+.slider-input {
+  width: 60px;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 0;          
+  background-color: #fff;    /* light background */
+  color: #000;               /* black text */
+
+  /* Remove browser blue focus ring */
+  outline: none;
+  box-shadow: none;
+
+  /* Show ellipsis for long numbers */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  /* Optional: subtle focus border */
+  transition: border-color 0.2s;
+}
+.slider-input:focus {
+  border-color: #9ca3af; /* gray-400 */
+}

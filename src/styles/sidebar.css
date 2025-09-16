@@ -12,8 +12,9 @@
   color: #111827;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   outline: none;
-  width: 100%;
+  width: 200px;
   box-sizing: border-box;
+  margin-left: 3%; 
 }
 
 /* Focus State (inputs) */

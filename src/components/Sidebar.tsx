@@ -1,21 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import {
-  LuChevronLeft,
-  LuChevronRight,
-  LuCalendar,
-  LuDatabase,
-  LuPalette,
-  LuArrowLeftRight,
-  LuImage,
-} from "react-icons/lu";
+import { LuChevronLeft, LuChevronRight, LuCalendar, LuDatabase, LuPalette, LuArrowLeftRight, LuImage } from "react-icons/lu";
 import DatePicker from "react-datepicker";
 import Select from "react-select";
 import type { StylesConfig, SingleValue } from "react-select";
 import "react-datepicker/dist/react-datepicker.css";
 import "../styles/sidebar.css";
 import nasaLogo from "../assets/NASA.svg";
-import MultiRangeSlider from "./ui/MultiRangeSlider";
+import MultiRangeSlider from "./MultiRangeSlider";
 import { ColormapOption, ColormapSingleValue } from "./ColormapGradient";
+import { registerRasterSearch } from "../services/rasterApi";
+import { datasetRanges } from "../constants/MultiRange";
 
 type SidebarProps = {
   collapsed?: boolean;
@@ -24,20 +18,8 @@ type SidebarProps = {
   onSearchId?: (id: string) => void;
   onColormapChange?: (colormap: string) => void;
   onImageryToggle?: (visible: boolean) => void;
+  onRescaleChange?: (rescale: [number, number]) => void;
 };
-
-interface ApiLink {
-  href: string;
-  rel: string;
-  title?: string;
-  templated?: boolean;
-}
-
-interface ApiResponse {
-  id: string;
-  links?: ApiLink[];
-}
-
 interface OptionType {
   value: string;
   label: string;
@@ -56,6 +38,9 @@ const colormapOptions: OptionType[] = [
   { value: "viridis", label: "viridis" },
   { value: "magma", label: "magma" },
   { value: "rdylgn", label: "rdylgn" },
+  { value: "plasma", label: "plasma" },
+  { value: "inferno", label: "inferno" },
+  { value: "cividis", label: "cividis" }
 ];
 
 const selectStyles: StylesConfig<OptionType, false> = {
@@ -114,6 +99,7 @@ export default function Sidebar({
   onSearchId,
   onColormapChange,
   onImageryToggle,
+  onRescaleChange
 }: SidebarProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(collapsed);
   const isCollapsed = onToggle ? collapsed : internalCollapsed;
@@ -121,7 +107,7 @@ export default function Sidebar({
   const [date, setDate] = useState<Date | null>(null);
   const [dataset, setDataset] = useState(datasetOptions[0].value);
   const [colormap, setColormap] = useState(colormapOptions[0].value);
-  const [rescale, setRescale] = useState<[number, number]>([0, 1000]);
+  const [rescale, setRescale] = useState<[number, number]>([0, 50]);
   const [showImagery, setShowImagery] = useState(true);
 
   const handleToggle = () => (onToggle ? onToggle() : setInternalCollapsed((v) => !v));
@@ -140,54 +126,24 @@ export default function Sidebar({
     latestSigRef.current = sig;
 
     (async () => {
-      try {
-        const payload: Record<string, unknown> = {
-          collections: [datasetKey],
-          datetime: `${dateKey}T00:00:00Z`,
-        };
-
-        const response = await fetch("https://openveda.cloud/api/raster/searches/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: ac.signal,
-        });
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data: ApiResponse = await response.json();
-        console.log("register response:", data);
-
-        const tileJsonLink = data.links?.[1];
-        if (tileJsonLink) {
-          const href = tileJsonLink.href.replace("{tileMatrixSetId}", "WebMercatorQuad");
-          const url = new URL(href);
-          url.searchParams.set("assets", "cog_default");
-          url.searchParams.set("pixel_selection", "first");
-
-          try {
-            const tileResp = await fetch(url.toString());
-            if (!tileResp.ok) throw new Error(`TileJSON HTTP ${tileResp.status}`);
-            const tileData = await tileResp.json();
-            console.log("tilejson data:", tileData);
-
-            if (tileData.tiles && Array.isArray(tileData.tiles)) {
-              const tileTemplate = tileData.tiles[0];
-              if (latestSigRef.current === sig) {
-                onSearchId?.(tileTemplate);
-              }
-            }
-          } catch (err) {
-            console.error("TileJSON fetch error:", err);
-          }
-        }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        console.error("register failed:", err);
+      const tileTemplate = await registerRasterSearch(datasetKey, dateKey, ac.signal);
+      if (tileTemplate && latestSigRef.current === sig) {
+        onSearchId?.(tileTemplate);
+      } else {
+        console.warn("No tileTemplate returned for dataset:", datasetKey);
       }
     })();
 
     return () => ac.abort();
   }, [dateKey, datasetKey, onSearchId]);
+
+  useEffect(() => {
+    if (dataset && datasetRanges[dataset]) {
+      const [dMin, dMax] = datasetRanges[dataset];
+      setRescale([dMin, dMax]); 
+      onRescaleChange?.([dMin, dMax]);  
+    }
+  }, [dataset, onRescaleChange]);
 
   const handleReset = () => {
     latestSigRef.current = "__reset__";
@@ -400,9 +356,15 @@ export default function Sidebar({
           {!isCollapsed && (
             <MultiRangeSlider
               value={rescale}
-              step={0.1}
-              onChange={(val) => setRescale(val)}
-            />
+              min={datasetRanges[dataset]?.[0] ?? -1000}
+              max={datasetRanges[dataset]?.[1] ?? 1000}
+              step={1}
+              colormap={colormap}   
+              onChange={(val) => {
+                setRescale(val);
+                onRescaleChange?.(val); 
+              }}
+              />
           )}
         </div>
 
