@@ -39,7 +39,3 @@ It connects to VEDA APIS, fetches the imagery collections, and renders them on a
 4. Change Colormaps and Rescale
   - Provides dropdown option for colormaps to select different colormaps (e.g., viridis, magma, rdylgn, inferno, plasma )
   - Allows the user to adjust the rescale parameters for better visualization
-
-  
-
-           
